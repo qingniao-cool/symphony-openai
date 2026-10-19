@@ -1631,6 +1631,26 @@ API design notes:
 - If the dashboard is a client-side app, it SHOULD consume this API rather than duplicating state
   logic.
 
+### 13.8 OPTIONAL Daily Reporting Extension
+
+An implementation MAY generate a daily Markdown project report directly from normalized tracker
+items and the structured runtime snapshot. This extension MUST NOT invoke the coding agent or infer
+facts absent from those sources.
+
+Extension config:
+
+- `reporting.enabled` (boolean, default `false`)
+- `reporting.daily_at` (24-hour `HH:MM` local time)
+- `reporting.timezone` (IANA timezone)
+- `reporting.output_root` (report directory, resolved relative to the workflow file)
+
+When enabled, the extension writes `<output_root>/YYYY-MM-DD.md`. It MUST preserve an existing
+report for the date, SHOULD recover a missed report when restarted after the configured time, and
+SHOULD expose the latest report through any shipped dashboard/API. When disabled, it MUST NOT start
+the reporting scheduler. A report MAY include terminal items updated that local day, active items,
+review/merge/deployment queues, blocked/failed/retrying entries, active-agent count, runtime, and
+token totals when those values are available as structured data.
+
 ## 14. Failure Model and Recovery Strategy
 
 ### 14.1 Failure Classes

@@ -388,6 +388,9 @@ defmodule SymphonyElixir.ExtensionsTest do
     assert json_response(get(build_conn(), "/api/v1/refresh"), 405) ==
              %{"error" => %{"code" => "method_not_allowed", "message" => "Method not allowed"}}
 
+    assert json_response(post(build_conn(), "/api/v1/reports/latest", %{}), 405) ==
+             %{"error" => %{"code" => "method_not_allowed", "message" => "Method not allowed"}}
+
     assert json_response(post(build_conn(), "/", %{}), 405) ==
              %{"error" => %{"code" => "method_not_allowed", "message" => "Method not allowed"}}
 
@@ -412,6 +415,63 @@ defmodule SymphonyElixir.ExtensionsTest do
                  "message" => "Orchestrator is unavailable"
                }
              }
+  end
+
+  test "latest daily report is exposed by the API and dashboard" do
+    orchestrator_name = Module.concat(__MODULE__, :DailyReportOrchestrator)
+
+    {:ok, _pid} =
+      StaticOrchestrator.start_link(
+        name: orchestrator_name,
+        snapshot: static_snapshot(),
+        refresh: %{queued: true, coalesced: false, requested_at: DateTime.utc_now(), operations: []}
+      )
+
+    report_reader = fn ->
+      {:ok,
+       %{
+         date: ~D[2026-10-19],
+         path: "/reports/2026-10-19.md",
+         content: "# Daily Report — 2026-10-19\n\n## In progress\n\n- KHI-7"
+       }}
+    end
+
+    start_test_endpoint(
+      orchestrator: orchestrator_name,
+      snapshot_timeout_ms: 50,
+      report_reader: report_reader
+    )
+
+    assert json_response(get(build_conn(), "/api/v1/reports/latest"), 200) == %{
+             "date" => "2026-10-19",
+             "content" => "# Daily Report — 2026-10-19\n\n## In progress\n\n- KHI-7"
+           }
+
+    {:ok, _view, html} = live(build_conn(), "/")
+    assert html =~ "Latest daily report"
+    assert html =~ "Report date:"
+    assert html =~ "Daily Report — 2026-10-19"
+    assert html =~ ~s(href="/api/v1/reports/latest")
+  end
+
+  test "latest daily report API and dashboard expose a clear empty state" do
+    orchestrator_name = Module.concat(__MODULE__, :EmptyDailyReportOrchestrator)
+
+    {:ok, _pid} =
+      StaticOrchestrator.start_link(
+        name: orchestrator_name,
+        snapshot: static_snapshot(),
+        refresh: %{queued: true, coalesced: false, requested_at: DateTime.utc_now(), operations: []}
+      )
+
+    start_test_endpoint(orchestrator: orchestrator_name, snapshot_timeout_ms: 50)
+
+    assert json_response(get(build_conn(), "/api/v1/reports/latest"), 404) == %{
+             "error" => %{"code" => "report_not_found", "message" => "No daily report is available"}
+           }
+
+    {:ok, _view, html} = live(build_conn(), "/")
+    assert html =~ "No daily report has been generated yet."
   end
 
   test "phoenix observability api preserves snapshot timeout behavior" do
@@ -645,7 +705,11 @@ defmodule SymphonyElixir.ExtensionsTest do
     endpoint_config =
       :symphony_elixir
       |> Application.get_env(SymphonyElixirWeb.Endpoint, [])
-      |> Keyword.merge(server: false, secret_key_base: String.duplicate("s", 64))
+      |> Keyword.merge(
+        server: false,
+        secret_key_base: String.duplicate("s", 64),
+        report_reader: fn -> {:error, :not_found} end
+      )
       |> Keyword.merge(overrides)
 
     Application.put_env(:symphony_elixir, SymphonyElixirWeb.Endpoint, endpoint_config)

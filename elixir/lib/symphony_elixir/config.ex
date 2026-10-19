@@ -85,6 +85,13 @@ defmodule SymphonyElixir.Config do
     end
   end
 
+  @spec reporting_settings() :: map()
+  def reporting_settings do
+    reporting = settings!().reporting
+    workflow_dir = Workflow.workflow_file_path() |> Path.expand() |> Path.dirname()
+    %{reporting | output_root: Path.expand(reporting.output_root, workflow_dir)}
+  end
+
   @doc false
   @spec local_workspace_root() :: Path.t()
   def local_workspace_root do

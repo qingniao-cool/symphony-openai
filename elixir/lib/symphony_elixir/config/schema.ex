@@ -289,6 +289,43 @@ defmodule SymphonyElixir.Config.Schema do
     end
   end
 
+  defmodule Reporting do
+    @moduledoc false
+    use Ecto.Schema
+    import Ecto.Changeset
+
+    @primary_key false
+    embedded_schema do
+      field(:enabled, :boolean, default: false)
+      field(:daily_at, :string, default: "18:00")
+      field(:timezone, :string, default: "Etc/UTC")
+      field(:output_root, :string, default: "./reports")
+    end
+
+    @spec changeset(%__MODULE__{}, map()) :: Ecto.Changeset.t()
+    def changeset(schema, attrs) do
+      schema
+      |> cast(attrs, [:enabled, :daily_at, :timezone, :output_root], empty_values: [])
+      |> validate_required([:enabled, :daily_at, :timezone, :output_root])
+      |> validate_change(:daily_at, &validate_daily_at/2)
+      |> validate_change(:timezone, &validate_timezone/2)
+      |> validate_change(:output_root, fn :output_root, value ->
+        if String.trim(value) == "", do: [output_root: "can't be blank"], else: []
+      end)
+    end
+
+    defp validate_daily_at(:daily_at, value) do
+      case Time.from_iso8601(value <> ":00") do
+        {:ok, _time} -> []
+        {:error, _reason} -> [daily_at: "must use 24-hour HH:MM format"]
+      end
+    end
+
+    defp validate_timezone(:timezone, value) do
+      if Tzdata.zone_exists?(value), do: [], else: [timezone: "must be a valid IANA timezone"]
+    end
+  end
+
   embedded_schema do
     embeds_one(:tracker, Tracker, on_replace: :update, defaults_to_struct: true)
     embeds_one(:polling, Polling, on_replace: :update, defaults_to_struct: true)
@@ -299,6 +336,7 @@ defmodule SymphonyElixir.Config.Schema do
     embeds_one(:hooks, Hooks, on_replace: :update, defaults_to_struct: true)
     embeds_one(:observability, Observability, on_replace: :update, defaults_to_struct: true)
     embeds_one(:server, Server, on_replace: :update, defaults_to_struct: true)
+    embeds_one(:reporting, Reporting, on_replace: :update, defaults_to_struct: true)
   end
 
   @spec parse(map()) :: {:ok, %__MODULE__{}} | {:error, {:invalid_workflow_config, String.t()}}
@@ -393,6 +431,7 @@ defmodule SymphonyElixir.Config.Schema do
     |> cast_embed(:hooks, with: &Hooks.changeset/2)
     |> cast_embed(:observability, with: &Observability.changeset/2)
     |> cast_embed(:server, with: &Server.changeset/2)
+    |> cast_embed(:reporting, with: &Reporting.changeset/2)
   end
 
   defp finalize_settings(settings) do
