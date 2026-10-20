@@ -17,6 +17,11 @@ tracker:
     - Done
 polling:
   interval_ms: 5000
+reporting:
+  enabled: false
+  daily_at: "18:00"
+  timezone: "Asia/Shanghai"
+  output_root: "./reports"
 workspace:
   root: ~/code/symphony-workspaces
 hooks:

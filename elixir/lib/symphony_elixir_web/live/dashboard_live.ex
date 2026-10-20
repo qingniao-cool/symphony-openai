@@ -5,6 +5,7 @@ defmodule SymphonyElixirWeb.DashboardLive do
 
   use Phoenix.LiveView, layout: {SymphonyElixirWeb.Layouts, :app}
 
+  alias SymphonyElixir.DailyReport
   alias SymphonyElixirWeb.{Endpoint, ObservabilityPubSub, Presenter}
   @runtime_tick_ms 1_000
 
@@ -13,6 +14,7 @@ defmodule SymphonyElixirWeb.DashboardLive do
     socket =
       socket
       |> assign(:payload, load_payload())
+      |> assign(:latest_report, load_latest_report())
       |> assign(:now, DateTime.utc_now())
 
     if connected?(socket) do
@@ -26,7 +28,11 @@ defmodule SymphonyElixirWeb.DashboardLive do
   @impl true
   def handle_info(:runtime_tick, socket) do
     schedule_runtime_tick()
-    {:noreply, assign(socket, :now, DateTime.utc_now())}
+
+    {:noreply,
+     socket
+     |> assign(:latest_report, load_latest_report())
+     |> assign(:now, DateTime.utc_now())}
   end
 
   @impl true
@@ -110,6 +116,26 @@ defmodule SymphonyElixirWeb.DashboardLive do
             <p class="metric-value numeric"><%= format_runtime_seconds(total_runtime_seconds(@payload, @now)) %></p>
             <p class="metric-detail">Total Codex runtime across completed and active sessions.</p>
           </article>
+        </section>
+
+        <section class="section-card" id="latest-daily-report">
+          <div class="section-header">
+            <div>
+              <h2 class="section-title">Latest daily report</h2>
+              <p class="section-copy">Structured project status generated without model inference.</p>
+            </div>
+            <a class="issue-link" href="/api/v1/reports/latest">JSON view</a>
+          </div>
+
+          <%= case @latest_report do %>
+            <% {:ok, report} -> %>
+              <p class="muted">Report date: <span class="mono"><%= Date.to_iso8601(report.date) %></span></p>
+              <pre class="code-panel"><%= report.content %></pre>
+            <% {:error, :not_found} -> %>
+              <p class="empty-state">No daily report has been generated yet.</p>
+            <% {:error, _reason} -> %>
+              <p class="empty-state">The latest daily report is unavailable.</p>
+          <% end %>
         </section>
 
         <section class="section-card">
@@ -333,12 +359,18 @@ defmodule SymphonyElixirWeb.DashboardLive do
     Presenter.state_payload(orchestrator(), snapshot_timeout_ms())
   end
 
+  defp load_latest_report, do: report_reader().()
+
   defp orchestrator do
     Endpoint.config(:orchestrator) || SymphonyElixir.Orchestrator
   end
 
   defp snapshot_timeout_ms do
     Endpoint.config(:snapshot_timeout_ms) || 15_000
+  end
+
+  defp report_reader do
+    Endpoint.config(:report_reader) || (&DailyReport.latest/0)
   end
 
   attr(:identifier, :string, required: true)

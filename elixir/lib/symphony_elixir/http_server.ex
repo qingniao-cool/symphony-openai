@@ -23,6 +23,7 @@ defmodule SymphonyElixir.HttpServer do
         host = Keyword.get(opts, :host, Config.settings!().server.host)
         orchestrator = Keyword.get(opts, :orchestrator, Orchestrator)
         snapshot_timeout_ms = Keyword.get(opts, :snapshot_timeout_ms, 15_000)
+        report_reader = Keyword.get(opts, :report_reader, &SymphonyElixir.DailyReport.latest/0)
 
         with {:ok, ip} <- parse_host(host) do
           endpoint_opts = [
@@ -31,6 +32,7 @@ defmodule SymphonyElixir.HttpServer do
             url: [host: normalize_host(host)],
             orchestrator: orchestrator,
             snapshot_timeout_ms: snapshot_timeout_ms,
+            report_reader: report_reader,
             secret_key_base: secret_key_base()
           ]
 

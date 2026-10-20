@@ -6,11 +6,26 @@ defmodule SymphonyElixirWeb.ObservabilityApiController do
   use Phoenix.Controller, formats: [:json]
 
   alias Plug.Conn
+  alias SymphonyElixir.DailyReport
   alias SymphonyElixirWeb.{Endpoint, Presenter}
 
   @spec state(Conn.t(), map()) :: Conn.t()
   def state(conn, _params) do
     json(conn, Presenter.state_payload(orchestrator(), snapshot_timeout_ms()))
+  end
+
+  @spec latest_report(Conn.t(), map()) :: Conn.t()
+  def latest_report(conn, _params) do
+    case report_reader().() do
+      {:ok, report} ->
+        json(conn, %{date: Date.to_iso8601(report.date), content: report.content})
+
+      {:error, :not_found} ->
+        error_response(conn, 404, "report_not_found", "No daily report is available")
+
+      {:error, _reason} ->
+        error_response(conn, 503, "report_unavailable", "The latest daily report is unavailable")
+    end
   end
 
   @spec issue(Conn.t(), map()) :: Conn.t()
@@ -59,5 +74,9 @@ defmodule SymphonyElixirWeb.ObservabilityApiController do
 
   defp snapshot_timeout_ms do
     Endpoint.config(:snapshot_timeout_ms) || 15_000
+  end
+
+  defp report_reader do
+    Endpoint.config(:report_reader) || (&DailyReport.latest/0)
   end
 end

@@ -139,6 +139,11 @@ agent:
   max_turns: 20
 codex:
   command: codex app-server
+reporting:
+  enabled: true
+  daily_at: "18:00"
+  timezone: "Asia/Shanghai"
+  output_root: "./reports"
 ---
 
 You are working on an issue from the configured tracker {{ issue.identifier }}.
@@ -149,6 +154,9 @@ Title: {{ issue.title }} Body: {{ issue.description }}
 Notes:
 
 - If a value is missing, defaults are used.
+- `reporting.enabled` defaults to `false`. When enabled, `reporting.daily_at` is a 24-hour local
+  time, `reporting.timezone` is an IANA timezone, and `reporting.output_root` is resolved relative
+  to the workflow file.
 - `tracker.kind` selects an adapter. Adapter-owned endpoint, scope, and auth settings belong under
   `tracker.provider`; the current Linear adapter still accepts the older flat `endpoint`,
   `api_key`, `project_slug`, and `assignee` aliases for compatibility.
@@ -302,6 +310,22 @@ The observability UI now runs on a minimal Phoenix stack:
 - Bandit as the HTTP server
 - Phoenix dependency static assets for the LiveView client bootstrap
 - Tracker issue identifiers link to the tracker-provided URL when it uses `http` or `https`
+- The latest generated daily report is rendered on the dashboard and available as JSON from
+  `GET /api/v1/reports/latest`
+
+## Daily project reports
+
+The optional reporter writes `YYYY-MM-DD.md` under `reporting.output_root` at the configured local
+time. On startup after that time, it catches up a missing report for the current date. Existing
+files are opened exclusively and are never regenerated or overwritten, so multiple starts on the
+same day remain idempotent.
+
+Reports are assembled without a Codex call. They contain only tracker issue fields and the
+orchestrator's structured runtime snapshot: tasks completed that day, active tasks, work waiting
+for review/merge/deployment, blocked/failed/retrying work, active-agent count, cumulative runtime,
+and token totals. If either structured source is unavailable, generation fails and retries rather
+than emitting a guessed or partial report. Omit the section or set `enabled: false` to avoid
+starting the reporting process entirely.
 
 ## Project Layout
 

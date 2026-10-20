@@ -27,7 +27,9 @@ defmodule SymphonyElixir.MixProject do
           SymphonyElixir.CLI,
           SymphonyElixir.Codex.AppServer,
           SymphonyElixir.Codex.DynamicTool,
+          SymphonyElixir.DailyReport,
           SymphonyElixir.HttpServer,
+          SymphonyElixir.Reporting,
           SymphonyElixir.StatusDashboard,
           SymphonyElixir.LogFile,
           SymphonyElixir.Workspace,
@@ -80,6 +82,7 @@ defmodule SymphonyElixir.MixProject do
       {:yaml_elixir, "~> 2.12"},
       {:solid, "~> 1.2"},
       {:ecto, "~> 3.13"},
+      {:tzdata, "~> 1.1"},
       {:burrito, "~> 1.5", only: :prod, runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev], runtime: false}

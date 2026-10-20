@@ -1,6 +1,7 @@
 import Config
 
 config :phoenix, :json_library, Jason
+config :elixir, :time_zone_database, Tzdata.TimeZoneDatabase
 
 config :symphony_elixir, SymphonyElixirWeb.Endpoint,
   adapter: Bandit.PhoenixAdapter,

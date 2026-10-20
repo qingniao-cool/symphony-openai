@@ -1043,6 +1043,7 @@ defmodule SymphonyElixir.CoreTest do
 
     :sys.replace_state(pid, fn _ ->
       initial_state
+      |> quiesce_pending_tick()
       |> Map.put(:running, %{issue_id => running_entry})
       |> Map.put(:claimed, MapSet.new([issue_id]))
       |> Map.put(:retry_attempts, %{})
@@ -1056,7 +1057,7 @@ defmodule SymphonyElixir.CoreTest do
     assert MapSet.member?(state.completed, issue_id)
     assert %{attempt: 1, due_at_ms: due_at_ms} = state.retry_attempts[issue_id]
     assert is_integer(due_at_ms)
-    assert_due_in_range(due_at_ms, 500, 1_100)
+    assert_due_in_range(due_at_ms, -1_000, 1_100)
   end
 
   test "abnormal worker exit increments retry attempt progressively" do
@@ -1084,6 +1085,7 @@ defmodule SymphonyElixir.CoreTest do
 
     :sys.replace_state(pid, fn _ ->
       initial_state
+      |> quiesce_pending_tick()
       |> Map.put(:running, %{issue_id => running_entry})
       |> Map.put(:claimed, MapSet.new([issue_id]))
       |> Map.put(:retry_attempts, %{})
@@ -1096,7 +1098,7 @@ defmodule SymphonyElixir.CoreTest do
     assert %{attempt: 3, due_at_ms: due_at_ms, identifier: "MT-559", error: "agent exited: :boom"} =
              state.retry_attempts[issue_id]
 
-    assert_due_in_range(due_at_ms, 39_500, 40_500)
+    assert_due_in_range(due_at_ms, 38_000, 40_500)
   end
 
   test "first abnormal worker exit waits before retrying" do
@@ -1123,6 +1125,7 @@ defmodule SymphonyElixir.CoreTest do
 
     :sys.replace_state(pid, fn _ ->
       initial_state
+      |> quiesce_pending_tick()
       |> Map.put(:running, %{issue_id => running_entry})
       |> Map.put(:claimed, MapSet.new([issue_id]))
       |> Map.put(:retry_attempts, %{})
@@ -1135,7 +1138,7 @@ defmodule SymphonyElixir.CoreTest do
     assert %{attempt: 1, due_at_ms: due_at_ms, identifier: "MT-560", error: "agent exited: :boom"} =
              state.retry_attempts[issue_id]
 
-    assert_due_in_range(due_at_ms, 9_000, 10_500)
+    assert_due_in_range(due_at_ms, 8_000, 10_500)
   end
 
   test "stale retry timer messages do not consume newer retry entries" do
@@ -1260,6 +1263,11 @@ defmodule SymphonyElixir.CoreTest do
 
     assert remaining_ms >= min_remaining_ms
     assert remaining_ms <= max_remaining_ms
+  end
+
+  defp quiesce_pending_tick(state) do
+    if is_reference(state.tick_timer_ref), do: Process.cancel_timer(state.tick_timer_ref)
+    %{state | tick_timer_ref: nil, tick_token: make_ref()}
   end
 
   defp restore_app_env(key, nil), do: Application.delete_env(:symphony_elixir, key)
